@@ -28,8 +28,8 @@
       /* Player (transparent circle) reduced by 15% (from 64px to ~55px) */
       #player {
         position: absolute;
-        width: 55px;
-        height: 55px;
+        width: 53px;
+        height: 53px;
         border: 2px solid black;
         border-radius: 50%;
         background-color: transparent;
@@ -44,8 +44,8 @@
       /* Obstacles: reduced by 15% (from 54px to ~46px) */
       .obstacle {
         position: absolute;
-        width: 46px;
-        height: 46px;
+        width: 43px;
+        height: 43px;
         border-radius: 50%;
         background-color: black;
       }
@@ -71,23 +71,23 @@
             type="range"
             id="obstacleSpeedSlider"
             class="custom-range"
-            min="0.5"
-            max="5"
-            step="0.1"
+            min="1"
+            max="10"
+            step="1"
             value="3"
           />
         </div>
         <div class="col-md-6">
           <label for="accelerationSlider"
-            >Player Acceleration: <span id="accelerationValue"></span
+            >Acceleration Rate: <span id="accelerationValue"></span
           ></label>
           <input
             type="range"
             id="accelerationSlider"
             class="custom-range"
-            min="50"
-            max="550"
-            step="50"
+            min="100"
+            max="1000"
+            step="100"
             value="300"
           />
         </div>
@@ -127,8 +127,8 @@
           gameAreaHeight = dims.height;
 
         // Sizes (15% reduction adjustments)
-        var playerSize = 55; // Player ~55px (reduced from 64px)
-        var obstacleSize = 46; // Obstacles ~46px (reduced from 54px)
+        var playerSize = 53; // Player ~55px (reduced from 64px)
+        var obstacleSize = 43; // Obstacles ~46px (reduced from 54px)
         var playerRadius = playerSize / 2;
         var obstacleRadius = obstacleSize / 2;
 
@@ -137,13 +137,13 @@
         var acceleration = parseFloat($("#accelerationSlider").val()); // initial value (e.g., 100)
 
         // Display initial slider values.
-        $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(1));
+        $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(0));
         $("#accelerationValue").text(acceleration.toFixed(0));
 
         // Slider event handlers.
         $("#obstacleSpeedSlider").on("input change", function () {
           obstacleSpeed = parseFloat($(this).val());
-          $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(1));
+          $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(0));
         });
         $("#accelerationSlider").on("input change", function () {
           acceleration = parseFloat($(this).val());
@@ -170,7 +170,7 @@
         var turnRate = Math.PI; // radians/second
 
         // Create two target circles (red and green).
-        var targetRadius = 10; // half of 20px
+        var targetRadius = 9; // half of 20px
         var targetRed = $('<div id="targetRed" class="target"></div>').css(
           "background-color",
           "red"
@@ -366,7 +366,9 @@
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
           // --- Stationary Check for Firing ---
+          // Increment timer only if the target is completely covered AND the player is nearly stationary.
           if (
+            isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
             Math.abs(playerPos.y - lastPlayerPos.y) < 1
           ) {
@@ -376,7 +378,7 @@
           }
           lastPlayerPos.x = playerPos.x;
           lastPlayerPos.y = playerPos.y;
-          if (isTargetCovered() && stationaryTime >= 2000 && !readyToFire) {
+          if (stationaryTime >= 2000 && !readyToFire) {
             readyToFire = true;
             player.css("border-color", "yellow");
           }
