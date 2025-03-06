@@ -13,7 +13,7 @@
         background-color: #f8f9fa;
       }
       /* Responsive game area:
-       - Maximum size: 1280px × 960px (4:3 aspect ratio) */
+         - Maximum size: 1280px × 960px (4:3 aspect ratio) */
       #gameArea {
         position: relative;
         width: 100%;
@@ -53,6 +53,7 @@
   </head>
   <body>
     <div class="container">
+      <!-- Scoreboard -->
       <div class="row mt-3">
         <div class="col text-center">
           <p>
@@ -92,6 +93,14 @@
           />
         </div>
       </div>
+      <!-- Start Button and Timer -->
+      <div class="row mb-3">
+        <div class="col text-center">
+          <button id="startButton" class="btn btn-primary">Start Game</button>
+          <span id="timer" class="ml-3">05:00</span>
+        </div>
+      </div>
+      <!-- Game Area -->
       <div id="gameArea"></div>
     </div>
 
@@ -114,6 +123,11 @@
         var score = 0,
           hits = 0;
 
+        // Timer and game control variables.
+        var gameRunning = false;
+        var countdownInterval;
+        var remainingTime = 300; // 5 minutes in seconds
+
         // Helper function: get actual game area dimensions (using bounding rect for height)
         function getGameAreaDimensions() {
           return {
@@ -133,8 +147,8 @@
         var obstacleRadius = obstacleSize / 2;
 
         // Global variables controlled by sliders:
-        var obstacleSpeed = parseFloat($("#obstacleSpeedSlider").val()); // initial value (e.g., 2)
-        var acceleration = parseFloat($("#accelerationSlider").val()); // initial value (e.g., 100)
+        var obstacleSpeed = parseFloat($("#obstacleSpeedSlider").val());
+        var acceleration = parseFloat($("#accelerationSlider").val());
 
         // Display initial slider values.
         $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(0));
@@ -215,7 +229,6 @@
           obs.css({ left: ox + "px", top: oy + "px" });
           gameArea.append(obs);
           var angle = Math.random() * 2 * Math.PI;
-          // Store the random direction angle.
           obstacles.push({ el: obs, x: ox, y: oy, angle: angle });
         }
 
@@ -300,7 +313,43 @@
           });
         }
 
+        // Start Game button event handler.
+        $("#startButton").click(function () {
+          if (gameRunning) return; // Prevent restarting if already running.
+          // Reset scores and game state.
+          score = 0;
+          hits = 0;
+          $("#score").text(score);
+          $("#hits").text(hits);
+          resetGame();
+          gameRunning = true;
+          remainingTime = 300;
+          $("#timer").text("05:00");
+          lastTime = Date.now();
+          requestAnimationFrame(gameLoop);
+          // Start countdown timer.
+          countdownInterval = setInterval(function () {
+            remainingTime--;
+            var minutes = Math.floor(remainingTime / 60);
+            var seconds = remainingTime % 60;
+            var timeStr =
+              (minutes < 10 ? "0" + minutes : minutes) +
+              ":" +
+              (seconds < 10 ? "0" + seconds : seconds);
+            $("#timer").text(timeStr);
+            if (remainingTime <= 0) {
+              clearInterval(countdownInterval);
+              gameRunning = false;
+              alert(
+                "Time's up! Final Scores:\nSHOOT: " + score + "\nHIT: " + hits
+              );
+            }
+          }, 1000);
+        });
+
+        // Main game loop.
         function gameLoop() {
+          if (!gameRunning) return;
           dims = getGameAreaDimensions();
           gameAreaWidth = dims.width;
           gameAreaHeight = dims.height;
@@ -366,7 +415,6 @@
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
           // --- Stationary Check for Firing ---
-          // Increment timer only if the target is completely covered AND the player is nearly stationary.
           if (
             isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
@@ -385,12 +433,10 @@
 
           // --- Update Obstacles ---
           obstacles.forEach(function (obs) {
-            // Update velocity based on global obstacleSpeed and stored angle.
             var dx = obstacleSpeed * Math.cos(obs.angle);
             var dy = obstacleSpeed * Math.sin(obs.angle);
             obs.x += dx;
             obs.y += dy;
-            // Bounce off walls.
             if (obs.x < 0 || obs.x > gameAreaWidth - obstacleSize) {
               obs.angle = Math.PI - obs.angle;
               obs.x = Math.max(
@@ -406,7 +452,6 @@
               );
             }
             obs.el.css({ left: obs.x + "px", top: obs.y + "px" });
-            // Collision detection.
             if (
               circleCollision(
                 playerPos.x,
@@ -433,7 +478,6 @@
 
           requestAnimationFrame(gameLoop);
         }
-        requestAnimationFrame(gameLoop);
       });
     </script>
   </body>
