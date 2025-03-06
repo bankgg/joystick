@@ -104,6 +104,45 @@
       <div id="gameArea"></div>
     </div>
 
+    <!-- Modal for Final Score -->
+    <div
+      class="modal fade"
+      id="finalScoreModal"
+      tabindex="-1"
+      role="dialog"
+      aria-labelledby="finalScoreModalLabel"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog" role="document">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="finalScoreModalLabel">Final Score</h5>
+            <button
+              type="button"
+              class="close"
+              data-dismiss="modal"
+              aria-label="Close"
+            >
+              <span aria-hidden="true">&times;</span>
+            </button>
+          </div>
+          <div class="modal-body">
+            <p>SHOOT: <span id="finalShootScore"></span></p>
+            <p>HIT: <span id="finalHitScore"></span></p>
+          </div>
+          <div class="modal-footer">
+            <button
+              type="button"
+              class="btn btn-secondary"
+              data-dismiss="modal"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Audio element for warning sound -->
     <audio id="warningSound">
       <source
@@ -340,9 +379,10 @@
             if (remainingTime <= 0) {
               clearInterval(countdownInterval);
               gameRunning = false;
-              alert(
-                "Time's up! Final Scores:\nSHOOT: " + score + "\nHIT: " + hits
-              );
+              // Set final scores in the modal.
+              $("#finalShootScore").text(score);
+              $("#finalHitScore").text(hits);
+              $("#finalScoreModal").modal("show");
             }
           }, 1000);
         });
@@ -394,7 +434,6 @@
               if (Math.abs(horizontal) > 0.2) {
                 direction += turnRate * dtSec * horizontal;
               }
-              // Check fire button and ensure the target is still covered.
               if (gp.buttons[0].pressed && readyToFire && isTargetCovered()) {
                 score++;
                 $("#score").text(score);
