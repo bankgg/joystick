@@ -173,10 +173,7 @@
 
     <!-- Audio element for warning sound -->
     <audio id="warningSound">
-      <source
-        src="error.mp3"
-        type="audio/mpeg"
-      />
+      <source src="error.mp3" type="audio/mpeg" />
     </audio>
 
     <!-- jQuery and Bootstrap JS -->
@@ -243,6 +240,9 @@
         // Global variables controlled by sliders:
         var obstacleSpeed = parseFloat($("#obstacleSpeedSlider").val());
         var acceleration = parseFloat($("#accelerationSlider").val());
+        // deceleration defined in reference pixels per second²
+        var deceleration = 600;
+        var turnRate = Math.PI; // radians/second
 
         // Display initial slider values.
         $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(1));
@@ -278,8 +278,6 @@
         // Physics variables for the player.
         var speedVal = 0; // current speed (pixels per second)
         var direction = 0; // in radians (0 = up)
-        var deceleration = 600; // deceleration (pixels/second²)
-        var turnRate = Math.PI; // radians/second
 
         // Create two target circles (red and green).
         var targetRadius = 9; // half of 20px
@@ -405,6 +403,7 @@
         $(document)
           .keydown(function (e) {
             keys[e.which] = true;
+            // Fire button: spacebar (key code 32) when ready AND still covering the target.
             if (e.which === 32 && readyToFire && isTargetCovered()) {
               score++;
               $("#score").text(score);
@@ -455,16 +454,25 @@
           dims = getGameAreaDimensions();
           gameAreaWidth = dims.width;
           gameAreaHeight = dims.height;
+
+          // Calculate scale factor based on a reference width (1280px).
+          var refWidth = 1280;
+          var scaleFactor = gameAreaWidth / refWidth;
+          var effectiveAcceleration = acceleration * scaleFactor;
+          var effectiveObstacleSpeed = obstacleSpeed * scaleFactor;
+          var effectiveDeceleration = deceleration * scaleFactor;
+
           var now = Date.now();
           var dt = now - lastTime;
           var dtSec = dt / 1000;
           lastTime = now;
 
+          // Keyboard controls using effective acceleration and deceleration.
           if (keys[38]) {
-            speedVal += acceleration * dtSec;
+            speedVal += effectiveAcceleration * dtSec;
           }
           if (keys[40]) {
-            speedVal -= deceleration * dtSec;
+            speedVal -= effectiveDeceleration * dtSec;
             if (speedVal < 0) speedVal = 0;
           }
           if (keys[37]) {
@@ -474,15 +482,16 @@
             direction += turnRate * dtSec;
           }
 
+          // Gamepad controls.
           if (gamepadIndex !== null) {
             var gamepads = navigator.getGamepads();
             var gp = gamepads[gamepadIndex];
             if (gp) {
               var vertical = gp.axes[1];
               if (vertical < -0.2) {
-                speedVal += acceleration * dtSec * Math.abs(vertical);
+                speedVal += effectiveAcceleration * dtSec * Math.abs(vertical);
               } else if (vertical > 0.2) {
-                speedVal -= deceleration * dtSec * Math.abs(vertical);
+                speedVal -= effectiveDeceleration * dtSec * Math.abs(vertical);
                 if (speedVal < 0) speedVal = 0;
               }
               var horizontal = gp.axes[0];
@@ -497,6 +506,7 @@
             }
           }
 
+          // Update player position.
           playerPos.x += speedVal * Math.sin(direction) * dtSec;
           playerPos.y += -speedVal * Math.cos(direction) * dtSec;
           if (playerPos.x < 0) playerPos.x = 0;
@@ -507,6 +517,7 @@
             playerPos.y = gameAreaHeight - playerSize;
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
+          // Check if the player remains nearly stationary (for firing).
           if (
             isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
@@ -523,9 +534,10 @@
             player.css("border-color", "yellow");
           }
 
+          // Update obstacles using effective obstacle speed.
           obstacles.forEach(function (obs) {
-            var dx = obstacleSpeed * Math.cos(obs.angle);
-            var dy = obstacleSpeed * Math.sin(obs.angle);
+            var dx = effectiveObstacleSpeed * Math.cos(obs.angle);
+            var dy = effectiveObstacleSpeed * Math.sin(obs.angle);
             obs.x += dx;
             obs.y += dy;
             if (obs.x < 0 || obs.x > gameAreaWidth - obstacleSize) {
