@@ -14,9 +14,7 @@
       }
       /* Game area styling:
          - Width is 100% up to a max of 1280px.
-         - Height is set via JavaScript: if the ideal 4:3 height (width × 0.75)
-           is greater than the window height, the game area height is fixed to the window's height;
-           otherwise, the height is based on the 4:3 ratio.
+         - Height is set via JavaScript.
       */
       #gameArea {
         position: relative;
@@ -27,27 +25,21 @@
         background-color: #fff;
         overflow: hidden;
       }
-      /* Player (transparent circle) reduced by 15% (from 64px to ~55px) */
-      #player {
+      /* These styles will be overridden via inline CSS updates for scaling */
+      #player,
+      .target,
+      .obstacle {
         position: absolute;
-        width: 53px;
-        height: 53px;
+      }
+      #player {
         border: 2px solid black;
         border-radius: 50%;
         background-color: transparent;
       }
-      /* Targets: 20px circles */
       .target {
-        position: absolute;
-        width: 20px;
-        height: 20px;
         border-radius: 50%;
       }
-      /* Obstacles: reduced by 15% (from 54px to ~46px) */
       .obstacle {
-        position: absolute;
-        width: 43px;
-        height: 43px;
         border-radius: 50%;
         background-color: black;
       }
@@ -91,7 +83,7 @@
             min="100"
             max="5000"
             step="100"
-            value="1500"
+            value="2500"
           />
         </div>
         <div class="col-md-4">
@@ -173,7 +165,10 @@
 
     <!-- Audio element for warning sound -->
     <audio id="warningSound">
-      <source src="error.mp3" type="audio/mpeg" />
+      <source
+        src="https://www.soundjay.com/button/beep-07.mp3"
+        type="audio/mpeg"
+      />
     </audio>
 
     <!-- jQuery and Bootstrap JS -->
@@ -216,8 +211,13 @@
         var countdownInterval;
         var remainingTime = 300; // 5 minutes in seconds
 
-        // New global variable for invulnerability.
+        // Global variable for invulnerability.
         var invulnerable = false;
+
+        // Base sizes (at reference resolution, 1280px wide)
+        var basePlayerSize = 61.35;
+        var baseObstacleSize = 49.78;
+        var baseTargetSize = 23.15;
 
         // Helper function: get actual game area dimensions.
         function getGameAreaDimensions() {
@@ -231,13 +231,7 @@
         var gameAreaWidth = dims.width,
           gameAreaHeight = dims.height;
 
-        // Sizes (15% reduction adjustments)
-        var playerSize = 53; // Player ~55px (reduced from 64px)
-        var obstacleSize = 43; // Obstacles ~46px (reduced from 54px)
-        var playerRadius = playerSize / 2;
-        var obstacleRadius = obstacleSize / 2;
-
-        // Global variables controlled by sliders:
+        // Global variables controlled by sliders.
         var obstacleSpeed = parseFloat($("#obstacleSpeedSlider").val());
         var acceleration = parseFloat($("#accelerationSlider").val());
         // deceleration defined in reference pixels per second²
@@ -268,19 +262,8 @@
           player = $('<div id="player"></div>');
           gameArea.append(player);
         }
-        // Center the player initially.
-        var playerPos = {
-          x: (gameAreaWidth - playerSize) / 2,
-          y: (gameAreaHeight - playerSize) / 2,
-        };
-        player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
-        // Physics variables for the player.
-        var speedVal = 0; // current speed (pixels per second)
-        var direction = 0; // in radians (0 = up)
-
-        // Create two target circles (red and green).
-        var targetRadius = 9; // half of 20px
+        // Create target elements.
         var targetRed = $('<div id="targetRed" class="target"></div>').css(
           "background-color",
           "red"
@@ -296,14 +279,27 @@
           dims = getGameAreaDimensions();
           gameAreaWidth = dims.width;
           gameAreaHeight = dims.height;
+          // Compute current scale factor.
+          var currentScale = gameAreaWidth / 1280;
+          var effectiveTargetSize = baseTargetSize * currentScale;
           // Randomize red target position.
-          var xRed = Math.random() * (gameAreaWidth - 20);
-          var yRed = Math.random() * (gameAreaHeight - 20);
-          targetRed.css({ left: xRed + "px", top: yRed + "px" });
+          var xRed = Math.random() * (gameAreaWidth - effectiveTargetSize);
+          var yRed = Math.random() * (gameAreaHeight - effectiveTargetSize);
+          targetRed.css({
+            left: xRed + "px",
+            top: yRed + "px",
+            width: effectiveTargetSize + "px",
+            height: effectiveTargetSize + "px",
+          });
           // Randomize green target position.
-          var xGreen = Math.random() * (gameAreaWidth - 20);
-          var yGreen = Math.random() * (gameAreaHeight - 20);
-          targetGreen.css({ left: xGreen + "px", top: yGreen + "px" });
+          var xGreen = Math.random() * (gameAreaWidth - effectiveTargetSize);
+          var yGreen = Math.random() * (gameAreaHeight - effectiveTargetSize);
+          targetGreen.css({
+            left: xGreen + "px",
+            top: yGreen + "px",
+            width: effectiveTargetSize + "px",
+            height: effectiveTargetSize + "px",
+          });
           // Randomly choose the designated target.
           currentTarget = Math.random() < 0.5 ? "red" : "green";
           $("#currentTarget").text(currentTarget.toUpperCase());
@@ -322,31 +318,62 @@
             obs.el.remove();
           });
           obstacles = [];
+          dims = getGameAreaDimensions();
+          gameAreaWidth = dims.width;
+          gameAreaHeight = dims.height;
+          var currentScale = gameAreaWidth / 1280;
+          var effectiveObstacleSize = baseObstacleSize * currentScale;
           var numObstacles = parseInt($("#obstacleCountSlider").val());
           for (var i = 0; i < numObstacles; i++) {
             var obs = $('<div class="obstacle"></div>');
-            dims = getGameAreaDimensions();
-            gameAreaWidth = dims.width;
-            gameAreaHeight = dims.height;
-            var ox = Math.random() * (gameAreaWidth - obstacleSize);
-            var oy = Math.random() * (gameAreaHeight - obstacleSize);
-            obs.css({ left: ox + "px", top: oy + "px" });
+            var ox = Math.random() * (gameAreaWidth - effectiveObstacleSize);
+            var oy = Math.random() * (gameAreaHeight - effectiveObstacleSize);
+            obs.css({
+              left: ox + "px",
+              top: oy + "px",
+              width: effectiveObstacleSize + "px",
+              height: effectiveObstacleSize + "px",
+            });
             gameArea.append(obs);
             var angle = Math.random() * 2 * Math.PI;
             obstacles.push({ el: obs, x: ox, y: oy, angle: angle });
           }
         }
 
+        // Center the player.
+        var playerPos = { x: 0, y: 0 };
+        function centerPlayer() {
+          dims = getGameAreaDimensions();
+          gameAreaWidth = dims.width;
+          gameAreaHeight = dims.height;
+          var currentScale = gameAreaWidth / 1280;
+          var effectivePlayerSize = basePlayerSize * currentScale;
+          playerPos.x = (gameAreaWidth - effectivePlayerSize) / 2;
+          playerPos.y = (gameAreaHeight - effectivePlayerSize) / 2;
+          player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
+        }
+        centerPlayer();
+
+        // Physics variables for the player.
+        var speedVal = 0; // in pixels per second (base value)
+        var direction = 0; // in radians (0 = up)
+
+        // Global movement variables.
+        var keys = {};
+        var lastPlayerPos = { x: playerPos.x, y: playerPos.y };
+        var stationaryTime = 0;
+        var readyToFire = false;
+        var lastTime = Date.now();
+        var resetting = false;
+
         // Reset the game state (player, targets, obstacles) but keep score and hit count.
         function resetGame() {
           dims = getGameAreaDimensions();
           gameAreaWidth = dims.width;
           gameAreaHeight = dims.height;
-          playerPos.x = (gameAreaWidth - playerSize) / 2;
-          playerPos.y = (gameAreaHeight - playerSize) / 2;
+          centerPlayer();
           speedVal = 0;
           direction = 0;
-          player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
           lastPlayerPos.x = playerPos.x;
           lastPlayerPos.y = playerPos.y;
           stationaryTime = 0;
@@ -372,7 +399,6 @@
           $("#timer").text("05:00");
           lastTime = Date.now();
           requestAnimationFrame(gameLoop);
-          // Start countdown timer.
           countdownInterval = setInterval(function () {
             remainingTime--;
             var minutes = Math.floor(remainingTime / 60);
@@ -392,18 +418,9 @@
           }, 1000);
         });
 
-        // Movement and control variables.
-        var keys = {};
-        var lastPlayerPos = { x: playerPos.x, y: playerPos.y };
-        var stationaryTime = 0; // time (ms) the player remains nearly stationary
-        var readyToFire = false;
-        var lastTime = Date.now();
-        var resetting = false;
-
         $(document)
           .keydown(function (e) {
             keys[e.which] = true;
-            // Fire button: spacebar (key code 32) when ready AND still covering the target.
             if (e.which === 32 && readyToFire && isTargetCovered()) {
               score++;
               $("#score").text(score);
@@ -432,20 +449,29 @@
 
         // Check if the designated target is covered by the player.
         function isTargetCovered() {
-          var playerCenter = {
-            x: playerPos.x + playerRadius,
-            y: playerPos.y + playerRadius,
-          };
+          // Recompute scale factor and effective sizes inside the function.
+          var dims = getGameAreaDimensions();
+          var gameAreaWidth = dims.width;
+          var scaleFactor = gameAreaWidth / 1280;
+          var effectivePlayerSize = basePlayerSize * scaleFactor;
+          var effectiveTargetSize = baseTargetSize * scaleFactor;
+          var effectivePlayerRadius = effectivePlayerSize / 2;
+          var effectiveTargetRadius = effectiveTargetSize / 2;
+
           var targetEl = currentTarget === "red" ? targetRed : targetGreen;
           var pos = targetEl.position();
+          var playerCenter = {
+            x: playerPos.x + effectivePlayerRadius,
+            y: playerPos.y + effectivePlayerRadius,
+          };
           var targetCenter = {
-            x: pos.left + targetRadius,
-            y: pos.top + targetRadius,
+            x: pos.left + effectiveTargetRadius,
+            y: pos.top + effectiveTargetRadius,
           };
           var dx = playerCenter.x - targetCenter.x;
           var dy = playerCenter.y - targetCenter.y;
           var distance = Math.sqrt(dx * dx + dy * dy);
-          return distance + targetRadius <= playerRadius;
+          return distance + effectiveTargetRadius <= effectivePlayerRadius;
         }
 
         // Main game loop.
@@ -457,7 +483,37 @@
 
           // Calculate scale factor based on a reference width (1280px).
           var refWidth = 1280;
-          var scaleFactor = gameAreaWidth / refWidth;
+          var scaleFactor = gameAreaWidth ? gameAreaWidth / refWidth : 1;
+
+          // Effective sizes.
+          var effectivePlayerSize = basePlayerSize * scaleFactor;
+          var effectiveObstacleSize = baseObstacleSize * scaleFactor;
+          var effectiveTargetSize = baseTargetSize * scaleFactor;
+          var effectivePlayerRadius = effectivePlayerSize / 2;
+          var effectiveObstacleRadius = effectiveObstacleSize / 2;
+          var effectiveTargetRadius = effectiveTargetSize / 2;
+
+          // Update element sizes.
+          player.css({
+            width: effectivePlayerSize + "px",
+            height: effectivePlayerSize + "px",
+          });
+          targetRed.css({
+            width: effectiveTargetSize + "px",
+            height: effectiveTargetSize + "px",
+          });
+          targetGreen.css({
+            width: effectiveTargetSize + "px",
+            height: effectiveTargetSize + "px",
+          });
+          obstacles.forEach(function (obs) {
+            obs.el.css({
+              width: effectiveObstacleSize + "px",
+              height: effectiveObstacleSize + "px",
+            });
+          });
+
+          // Effective speeds.
           var effectiveAcceleration = acceleration * scaleFactor;
           var effectiveObstacleSpeed = obstacleSpeed * scaleFactor;
           var effectiveDeceleration = deceleration * scaleFactor;
@@ -465,9 +521,10 @@
           var now = Date.now();
           var dt = now - lastTime;
           var dtSec = dt / 1000;
+          dtSec = Math.min(dtSec, 0.1);
           lastTime = now;
 
-          // Keyboard controls using effective acceleration and deceleration.
+          // Keyboard controls.
           if (keys[38]) {
             speedVal += effectiveAcceleration * dtSec;
           }
@@ -511,13 +568,13 @@
           playerPos.y += -speedVal * Math.cos(direction) * dtSec;
           if (playerPos.x < 0) playerPos.x = 0;
           if (playerPos.y < 0) playerPos.y = 0;
-          if (playerPos.x > gameAreaWidth - playerSize)
-            playerPos.x = gameAreaWidth - playerSize;
-          if (playerPos.y > gameAreaHeight - playerSize)
-            playerPos.y = gameAreaHeight - playerSize;
+          if (playerPos.x > gameAreaWidth - effectivePlayerSize)
+            playerPos.x = gameAreaWidth - effectivePlayerSize;
+          if (playerPos.y > gameAreaHeight - effectivePlayerSize)
+            playerPos.y = gameAreaHeight - effectivePlayerSize;
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
-          // Check if the player remains nearly stationary (for firing).
+          // Stationary check (for firing).
           if (
             isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
@@ -534,37 +591,37 @@
             player.css("border-color", "yellow");
           }
 
-          // Update obstacles using effective obstacle speed.
+          // Update obstacles.
           obstacles.forEach(function (obs) {
             var dx = effectiveObstacleSpeed * Math.cos(obs.angle);
             var dy = effectiveObstacleSpeed * Math.sin(obs.angle);
             obs.x += dx;
             obs.y += dy;
-            if (obs.x < 0 || obs.x > gameAreaWidth - obstacleSize) {
+            if (obs.x < 0 || obs.x > gameAreaWidth - effectiveObstacleSize) {
               obs.angle = Math.PI - obs.angle;
               obs.x = Math.max(
                 0,
-                Math.min(obs.x, gameAreaWidth - obstacleSize)
+                Math.min(obs.x, gameAreaWidth - effectiveObstacleSize)
               );
             }
-            if (obs.y < 0 || obs.y > gameAreaHeight - obstacleSize) {
+            if (obs.y < 0 || obs.y > gameAreaHeight - effectiveObstacleSize) {
               obs.angle = -obs.angle;
               obs.y = Math.max(
                 0,
-                Math.min(obs.y, gameAreaHeight - obstacleSize)
+                Math.min(obs.y, gameAreaHeight - effectiveObstacleSize)
               );
             }
             obs.el.css({ left: obs.x + "px", top: obs.y + "px" });
-            // Process collision only if player is not invulnerable.
+            // Process collision if not invulnerable.
             if (
               !invulnerable &&
               circleCollision(
                 playerPos.x,
                 playerPos.y,
-                playerRadius,
+                effectivePlayerRadius,
                 obs.x,
                 obs.y,
-                obstacleRadius
+                effectiveObstacleRadius
               )
             ) {
               if (!resetting) {
