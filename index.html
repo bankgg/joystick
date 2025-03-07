@@ -174,7 +174,7 @@
     <!-- Audio element for warning sound -->
     <audio id="warningSound">
       <source
-        src="error.mp3"
+        src="https://www.soundjay.com/button/beep-07.mp3"
         type="audio/mpeg"
       />
     </audio>
@@ -202,7 +202,6 @@
 
         // Toggle button update for sound.
         $("#soundToggle").on("click", function () {
-          // Give a short delay to allow the active class to toggle.
           setTimeout(function () {
             if ($("#soundToggle").hasClass("active")) {
               $("#soundToggle").text("Sound: On");
@@ -219,6 +218,9 @@
         var gameRunning = false;
         var countdownInterval;
         var remainingTime = 300; // 5 minutes in seconds
+
+        // New global variable for invulnerability.
+        var invulnerable = false;
 
         // Helper function: get actual game area dimensions.
         function getGameAreaDimensions() {
@@ -318,7 +320,6 @@
 
         // Function to create obstacles based on slider value.
         function createObstacles() {
-          // Remove old obstacles.
           obstacles.forEach(function (obs) {
             obs.el.remove();
           });
@@ -353,6 +354,11 @@
           stationaryTime = 0;
           resetTargets();
           createObstacles();
+          // Set invulnerability phase for 1.5 seconds after reset.
+          invulnerable = true;
+          setTimeout(function () {
+            invulnerable = false;
+          }, 1500);
         }
 
         // Start Game button event handler.
@@ -399,7 +405,6 @@
         $(document)
           .keydown(function (e) {
             keys[e.which] = true;
-            // Fire button: spacebar (key code 32) when ready AND still covering the target.
             if (e.which === 32 && readyToFire && isTargetCovered()) {
               score++;
               $("#score").text(score);
@@ -455,7 +460,6 @@
           var dtSec = dt / 1000;
           lastTime = now;
 
-          // Keyboard controls.
           if (keys[38]) {
             speedVal += acceleration * dtSec;
           }
@@ -470,7 +474,6 @@
             direction += turnRate * dtSec;
           }
 
-          // Gamepad controls.
           if (gamepadIndex !== null) {
             var gamepads = navigator.getGamepads();
             var gp = gamepads[gamepadIndex];
@@ -494,7 +497,6 @@
             }
           }
 
-          // Update player position.
           playerPos.x += speedVal * Math.sin(direction) * dtSec;
           playerPos.y += -speedVal * Math.cos(direction) * dtSec;
           if (playerPos.x < 0) playerPos.x = 0;
@@ -505,7 +507,6 @@
             playerPos.y = gameAreaHeight - playerSize;
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
-          // Check if the player remains nearly stationary (for firing).
           if (
             isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
@@ -522,7 +523,6 @@
             player.css("border-color", "yellow");
           }
 
-          // Update obstacles.
           obstacles.forEach(function (obs) {
             var dx = obstacleSpeed * Math.cos(obs.angle);
             var dy = obstacleSpeed * Math.sin(obs.angle);
@@ -543,7 +543,9 @@
               );
             }
             obs.el.css({ left: obs.x + "px", top: obs.y + "px" });
+            // Process collision only if player is not invulnerable.
             if (
+              !invulnerable &&
               circleCollision(
                 playerPos.x,
                 playerPos.y,
@@ -555,7 +557,6 @@
             ) {
               if (!resetting) {
                 resetting = true;
-                // Only play sound if the toggle button is active.
                 if ($("#soundToggle").hasClass("active")) {
                   var sound = document.getElementById("warningSound");
                   sound.play();
