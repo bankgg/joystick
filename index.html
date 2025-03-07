@@ -12,14 +12,16 @@
       body {
         background-color: #f8f9fa;
       }
-      /* Responsive game area:
-         - Maximum size: 1280px × 960px (4:3 aspect ratio) */
+      /* Game area styling:
+         - Width is 100% up to a max of 1280px.
+         - Height is set via JavaScript: if the ideal 4:3 height (width × 0.75)
+           is greater than the window height, the game area height is fixed to the window's height;
+           otherwise, the height is based on the 4:3 ratio.
+      */
       #gameArea {
         position: relative;
         width: 100%;
         max-width: 1280px;
-        height: 0;
-        padding-bottom: 75%; /* 960/1280 = 0.75 */
         margin: 20px auto;
         border: 2px solid #333;
         background-color: #fff;
@@ -64,24 +66,24 @@
       </div>
       <!-- Slider Controls -->
       <div class="row mb-3">
-        <div class="col-md-6">
-          <label for="obstacleSpeedSlider"
-            >Obstacle Speed: <span id="obstacleSpeedValue"></span
-          ></label>
+        <div class="col-md-4">
+          <label for="obstacleSpeedSlider">
+            Obstacle Speed: <span id="obstacleSpeedValue"></span>
+          </label>
           <input
             type="range"
             id="obstacleSpeedSlider"
             class="custom-range"
             min="1"
             max="10"
-            step="1"
+            step="0.1"
             value="3"
           />
         </div>
-        <div class="col-md-6">
-          <label for="accelerationSlider"
-            >Acceleration Rate: <span id="accelerationValue"></span
-          ></label>
+        <div class="col-md-4">
+          <label for="accelerationSlider">
+            Acceleration Rate: <span id="accelerationValue"></span>
+          </label>
           <input
             type="range"
             id="accelerationSlider"
@@ -92,11 +94,37 @@
             value="500"
           />
         </div>
+        <div class="col-md-4">
+          <label for="obstacleCountSlider">
+            Number of Obstacles: <span id="obstacleCountValue">3</span>
+          </label>
+          <input
+            type="range"
+            id="obstacleCountSlider"
+            class="custom-range"
+            min="1"
+            max="10"
+            step="1"
+            value="3"
+          />
+        </div>
       </div>
-      <!-- Start Button and Timer -->
+      <!-- Start Button, Sound Toggle and Timer (same row) -->
       <div class="row mb-3">
         <div class="col text-center">
-          <button id="startButton" class="btn btn-primary">Start Game</button>
+          <button
+            id="soundToggle"
+            type="button"
+            class="btn btn-outline-secondary active"
+            data-toggle="button"
+            aria-pressed="true"
+            autocomplete="off"
+          >
+            Sound: On
+          </button>
+          <button id="startButton" class="btn btn-primary ml-3">
+            Start Game
+          </button>
           <span id="timer" class="ml-3">05:00</span>
         </div>
       </div>
@@ -146,7 +174,7 @@
     <!-- Audio element for warning sound -->
     <audio id="warningSound">
       <source
-        src="https://www.soundjay.com/button/beep-07.mp3"
+        src="error.mp3"
         type="audio/mpeg"
       />
     </audio>
@@ -159,6 +187,31 @@
     <script>
       $(document).ready(function () {
         var gameArea = $("#gameArea");
+
+        // Adjust the game area height based on window size.
+        function adjustGameAreaSize() {
+          var viewportHeight = window.innerHeight;
+          var gameAreaWidth = gameArea.width();
+          var idealHeight = gameAreaWidth * 0.75;
+          var newHeight =
+            viewportHeight < idealHeight ? viewportHeight : idealHeight;
+          gameArea.css("height", newHeight + "px");
+        }
+        adjustGameAreaSize();
+        $(window).resize(adjustGameAreaSize);
+
+        // Toggle button update for sound.
+        $("#soundToggle").on("click", function () {
+          // Give a short delay to allow the active class to toggle.
+          setTimeout(function () {
+            if ($("#soundToggle").hasClass("active")) {
+              $("#soundToggle").text("Sound: On");
+            } else {
+              $("#soundToggle").text("Sound: Off");
+            }
+          }, 10);
+        });
+
         var score = 0,
           hits = 0;
 
@@ -167,7 +220,7 @@
         var countdownInterval;
         var remainingTime = 300; // 5 minutes in seconds
 
-        // Helper function: get actual game area dimensions (using bounding rect for height)
+        // Helper function: get actual game area dimensions.
         function getGameAreaDimensions() {
           return {
             width: gameArea.width(),
@@ -190,17 +243,21 @@
         var acceleration = parseFloat($("#accelerationSlider").val());
 
         // Display initial slider values.
-        $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(0));
+        $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(1));
         $("#accelerationValue").text(acceleration.toFixed(0));
+        $("#obstacleCountValue").text($("#obstacleCountSlider").val());
 
         // Slider event handlers.
         $("#obstacleSpeedSlider").on("input change", function () {
           obstacleSpeed = parseFloat($(this).val());
-          $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(0));
+          $("#obstacleSpeedValue").text(obstacleSpeed.toFixed(1));
         });
         $("#accelerationSlider").on("input change", function () {
           acceleration = parseFloat($(this).val());
           $("#accelerationValue").text(acceleration.toFixed(0));
+        });
+        $("#obstacleCountSlider").on("input change", function () {
+          $("#obstacleCountValue").text($(this).val());
         });
 
         // Create the player element if it doesn't exist.
@@ -219,7 +276,7 @@
         // Physics variables for the player.
         var speedVal = 0; // current speed (pixels per second)
         var direction = 0; // in radians (0 = up)
-        var deceleration = 600; // increased deceleration (pixels/second²)
+        var deceleration = 600; // deceleration (pixels/second²)
         var turnRate = Math.PI; // radians/second
 
         // Create two target circles (red and green).
@@ -256,20 +313,80 @@
         }
         resetTargets();
 
-        // Create three obstacles with uniform speed.
+        // Global obstacles array.
         var obstacles = [];
-        for (var i = 0; i < 3; i++) {
-          var obs = $('<div class="obstacle"></div>');
+
+        // Function to create obstacles based on slider value.
+        function createObstacles() {
+          // Remove old obstacles.
+          obstacles.forEach(function (obs) {
+            obs.el.remove();
+          });
+          obstacles = [];
+          var numObstacles = parseInt($("#obstacleCountSlider").val());
+          for (var i = 0; i < numObstacles; i++) {
+            var obs = $('<div class="obstacle"></div>');
+            dims = getGameAreaDimensions();
+            gameAreaWidth = dims.width;
+            gameAreaHeight = dims.height;
+            var ox = Math.random() * (gameAreaWidth - obstacleSize);
+            var oy = Math.random() * (gameAreaHeight - obstacleSize);
+            obs.css({ left: ox + "px", top: oy + "px" });
+            gameArea.append(obs);
+            var angle = Math.random() * 2 * Math.PI;
+            obstacles.push({ el: obs, x: ox, y: oy, angle: angle });
+          }
+        }
+
+        // Reset the game state (player, targets, obstacles) but keep score and hit count.
+        function resetGame() {
           dims = getGameAreaDimensions();
           gameAreaWidth = dims.width;
           gameAreaHeight = dims.height;
-          var ox = Math.random() * (gameAreaWidth - obstacleSize);
-          var oy = Math.random() * (gameAreaHeight - obstacleSize);
-          obs.css({ left: ox + "px", top: oy + "px" });
-          gameArea.append(obs);
-          var angle = Math.random() * 2 * Math.PI;
-          obstacles.push({ el: obs, x: ox, y: oy, angle: angle });
+          playerPos.x = (gameAreaWidth - playerSize) / 2;
+          playerPos.y = (gameAreaHeight - playerSize) / 2;
+          speedVal = 0;
+          direction = 0;
+          player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
+          lastPlayerPos.x = playerPos.x;
+          lastPlayerPos.y = playerPos.y;
+          stationaryTime = 0;
+          resetTargets();
+          createObstacles();
         }
+
+        // Start Game button event handler.
+        $("#startButton").click(function () {
+          if (gameRunning) return;
+          score = 0;
+          hits = 0;
+          $("#score").text(score);
+          $("#hits").text(hits);
+          resetGame();
+          gameRunning = true;
+          remainingTime = 300;
+          $("#timer").text("05:00");
+          lastTime = Date.now();
+          requestAnimationFrame(gameLoop);
+          // Start countdown timer.
+          countdownInterval = setInterval(function () {
+            remainingTime--;
+            var minutes = Math.floor(remainingTime / 60);
+            var seconds = remainingTime % 60;
+            var timeStr =
+              (minutes < 10 ? "0" + minutes : minutes) +
+              ":" +
+              (seconds < 10 ? "0" + seconds : seconds);
+            $("#timer").text(timeStr);
+            if (remainingTime <= 0) {
+              clearInterval(countdownInterval);
+              gameRunning = false;
+              $("#finalShootScore").text(score);
+              $("#finalHitScore").text(hits);
+              $("#finalScoreModal").modal("show");
+            }
+          }, 1000);
+        });
 
         // Movement and control variables.
         var keys = {};
@@ -327,66 +444,6 @@
           return distance + targetRadius <= playerRadius;
         }
 
-        // Reset the game state (player, targets, obstacles) but keep score and hit count.
-        function resetGame() {
-          dims = getGameAreaDimensions();
-          gameAreaWidth = dims.width;
-          gameAreaHeight = dims.height;
-          playerPos.x = (gameAreaWidth - playerSize) / 2;
-          playerPos.y = (gameAreaHeight - playerSize) / 2;
-          speedVal = 0;
-          direction = 0;
-          player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
-          lastPlayerPos.x = playerPos.x;
-          lastPlayerPos.y = playerPos.y;
-          stationaryTime = 0;
-          resetTargets();
-          obstacles.forEach(function (obs) {
-            dims = getGameAreaDimensions();
-            gameAreaWidth = dims.width;
-            gameAreaHeight = dims.height;
-            obs.x = Math.random() * (gameAreaWidth - obstacleSize);
-            obs.y = Math.random() * (gameAreaHeight - obstacleSize);
-            obs.angle = Math.random() * 2 * Math.PI;
-            obs.el.css({ left: obs.x + "px", top: obs.y + "px" });
-          });
-        }
-
-        // Start Game button event handler.
-        $("#startButton").click(function () {
-          if (gameRunning) return; // Prevent restarting if already running.
-          // Reset scores and game state.
-          score = 0;
-          hits = 0;
-          $("#score").text(score);
-          $("#hits").text(hits);
-          resetGame();
-          gameRunning = true;
-          remainingTime = 300;
-          $("#timer").text("05:00");
-          lastTime = Date.now();
-          requestAnimationFrame(gameLoop);
-          // Start countdown timer.
-          countdownInterval = setInterval(function () {
-            remainingTime--;
-            var minutes = Math.floor(remainingTime / 60);
-            var seconds = remainingTime % 60;
-            var timeStr =
-              (minutes < 10 ? "0" + minutes : minutes) +
-              ":" +
-              (seconds < 10 ? "0" + seconds : seconds);
-            $("#timer").text(timeStr);
-            if (remainingTime <= 0) {
-              clearInterval(countdownInterval);
-              gameRunning = false;
-              // Set final scores in the modal.
-              $("#finalShootScore").text(score);
-              $("#finalHitScore").text(hits);
-              $("#finalScoreModal").modal("show");
-            }
-          }, 1000);
-        });
-
         // Main game loop.
         function gameLoop() {
           if (!gameRunning) return;
@@ -398,23 +455,18 @@
           var dtSec = dt / 1000;
           lastTime = now;
 
-          // --- Control Input ---
           // Keyboard controls.
           if (keys[38]) {
-            // Up arrow: accelerate.
             speedVal += acceleration * dtSec;
           }
           if (keys[40]) {
-            // Down arrow: decelerate.
             speedVal -= deceleration * dtSec;
             if (speedVal < 0) speedVal = 0;
           }
           if (keys[37]) {
-            // Left arrow: turn left.
             direction -= turnRate * dtSec;
           }
           if (keys[39]) {
-            // Right arrow: turn right.
             direction += turnRate * dtSec;
           }
 
@@ -442,7 +494,7 @@
             }
           }
 
-          // --- Update Player Position ---
+          // Update player position.
           playerPos.x += speedVal * Math.sin(direction) * dtSec;
           playerPos.y += -speedVal * Math.cos(direction) * dtSec;
           if (playerPos.x < 0) playerPos.x = 0;
@@ -453,7 +505,7 @@
             playerPos.y = gameAreaHeight - playerSize;
           player.css({ left: playerPos.x + "px", top: playerPos.y + "px" });
 
-          // --- Stationary Check for Firing ---
+          // Check if the player remains nearly stationary (for firing).
           if (
             isTargetCovered() &&
             Math.abs(playerPos.x - lastPlayerPos.x) < 1 &&
@@ -470,7 +522,7 @@
             player.css("border-color", "yellow");
           }
 
-          // --- Update Obstacles ---
+          // Update obstacles.
           obstacles.forEach(function (obs) {
             var dx = obstacleSpeed * Math.cos(obs.angle);
             var dy = obstacleSpeed * Math.sin(obs.angle);
@@ -503,8 +555,11 @@
             ) {
               if (!resetting) {
                 resetting = true;
-                var sound = document.getElementById("warningSound");
-                sound.play();
+                // Only play sound if the toggle button is active.
+                if ($("#soundToggle").hasClass("active")) {
+                  var sound = document.getElementById("warningSound");
+                  sound.play();
+                }
                 hits++;
                 $("#hits").text(hits);
                 resetGame();
